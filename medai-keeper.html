@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MedAI Keeper</title>
+<style>
+:root{--bg:#f3f6f4;--sf:#fff;--tx:#14231c;--mu:#4b5d54;--bd:#cfd9d3;--pr:#0b6b4f;--pt:#fff;--pend:#b7791f;--ok:#177a45;--bad:#c0262d;--idle:#7a8a82;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1713;--sf:#17241e;--tx:#eaf3ee;--mu:#a3b5ab;--bd:#2c3d34;--pr:#3ecf9a;--pt:#06241a;--pend:#f0b44a;--ok:#4cd68a;--bad:#ff7b80;--idle:#8a9b92;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0e1713;--sf:#17241e;--tx:#eaf3ee;--mu:#a3b5ab;--bd:#2c3d34;--pr:#3ecf9a;--pt:#06241a;--pend:#f0b44a;--ok:#4cd68a;--bad:#ff7b80;--idle:#8a9b92;color-scheme:dark}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:18px/1.5 "Be Vietnam Pro","Segoe UI",system-ui,sans-serif}
+header{background:var(--pr);color:var(--pt);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+header h1{margin:0;font-size:22px}
+#clock{font-size:32px;font-weight:700;font-variant-numeric:tabular-nums}
+#mode{font-size:14px;opacity:.9}
+nav{display:flex;gap:6px;padding:10px 16px;overflow-x:auto;background:var(--sf);border-bottom:1px solid var(--bd)}
+nav button{font:inherit;font-weight:600;padding:10px 16px;border:2px solid var(--bd);background:var(--sf);color:var(--tx);border-radius:10px;cursor:pointer;white-space:nowrap}
+nav button[aria-selected="true"]{background:var(--pr);color:var(--pt);border-color:var(--pr)}
+main{max-width:980px;margin:0 auto;padding:16px}
+section{display:none}section.on{display:block}
+h2{font-size:22px;margin:4px 0 14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
+.card{background:var(--sf);border:1px solid var(--bd);border-left:8px solid var(--idle);border-radius:12px;padding:16px}
+.card.pending{border-left-color:var(--pend)}.card.taken{border-left-color:var(--ok)}.card.missed{border-left-color:var(--bad)}
+.card h3{margin:0 0 4px;font-size:20px}
+.badge{display:inline-block;font-weight:700;padding:2px 10px;border-radius:20px;border:2px solid currentColor;font-size:16px}
+.pending .badge{color:var(--pend)}.taken .badge{color:var(--ok)}.missed .badge{color:var(--bad)}.idle .badge{color:var(--idle)}
+.count{font-size:30px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--pend)}
+.panel{background:var(--sf);border:1px solid var(--bd);border-radius:12px;padding:16px;margin-bottom:16px}
+label{display:block;font-weight:600;margin:10px 0 4px}
+input,select,textarea{font:inherit;width:100%;padding:10px 12px;border:2px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx)}
+:focus-visible{outline:3px solid var(--pend);outline-offset:2px}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.btn{font:inherit;font-weight:700;padding:10px 18px;border:0;border-radius:10px;background:var(--pr);color:var(--pt);cursor:pointer;margin-top:12px}
+.btn.alt{background:transparent;color:var(--tx);border:2px solid var(--bd)}
+.btn.del{background:var(--bad);color:#fff;margin:0;padding:6px 12px}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--bd)}
+.wrap{overflow-x:auto}
+.msg{color:var(--mu);margin:6px 0}.err{color:var(--bad);font-weight:600}
+.stat{font-size:40px;font-weight:700;color:var(--ok)}
+#chatlog{height:340px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:4px}
+.b{max-width:85%;padding:10px 14px;border-radius:14px;white-space:pre-wrap}
+.b.me{align-self:flex-end;background:var(--pr);color:var(--pt)}
+.b.ai{align-self:flex-start;background:var(--bg);border:1px solid var(--bd)}
+.chatbar{display:flex;gap:8px;margin-top:10px}.chatbar .btn{margin:0}
+#toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--tx);color:var(--bg);padding:10px 18px;border-radius:10px;display:none}
+</style>
+</head>
+<body>
+<header>
+  <div><h1>MedAI Keeper</h1><div id="mode">Đang kết nối…</div></div>
+  <div id="clock">--:--:--</div>
+</header>
+<nav role="tablist" id="tabs"></nav>
+<main>
+<section id="s-dash" class="on">
+  <h2>Tình trạng 3 ngăn thuốc</h2>
+  <div class="grid" id="cards"></div>
+  <p class="msg" id="demohint"></p>
+</section>
+
+<section id="s-sched">
+  <h2>Lịch uống thuốc</h2>
+  <div class="panel">
+    <div class="row">
+      <div><label for="f-comp">Ngăn</label><select id="f-comp"><option>1</option><option>2</option><option>3</option></select></div>
+      <div><label for="f-drug">Tên thuốc</label><input id="f-drug" placeholder="Ví dụ: Thuốc dạ dày"></div>
+      <div><label for="f-time">Giờ uống</label><input id="f-time" type="time"></div>
+    </div>
+    <label for="f-note">Ghi chú</label><input id="f-note" placeholder="Ví dụ: Uống sau ăn 15 phút">
+    <p class="err" id="f-err" role="alert"></p>
+    <button class="btn" id="f-add">Thêm lịch</button>
+  </div>
+  <div class="panel wrap"><table><thead><tr><th>Ngăn</th><th>Thuốc</th><th>Giờ</th><th>Ghi chú</th><th></th></tr></thead><tbody id="sch-body"></tbody></table></div>
+</section>
+
+<section id="s-log">
+  <h2>Lịch sử uống thuốc</h2>
+  <div class="panel">
+    <div class="row">
+      <div><label for="l-date">Lọc theo ngày</label><input id="l-date" type="date"></div>
+      <div><label>Tỷ lệ tuân thủ</label><div class="stat" id="adh">--%</div></div>
+    </div>
+    <button class="btn alt" id="l-all">Xem tất cả</button>
+  </div>
+  <div class="panel wrap"><table><thead><tr><th>Thời gian</th><th>Ngăn</th><th>Thuốc</th><th>Trạng thái</th></tr></thead><tbody id="log-body"></tbody></table></div>
+</section>
+
+<section id="s-cfg">
+  <h2>Cài đặt</h2>
+  <div class="panel">
+    <label for="c-ssid">Tên Wi-Fi</label><input id="c-ssid">
+    <label for="c-wpass">Mật khẩu Wi-Fi</label><input id="c-wpass" type="password" autocomplete="off">
+    <label for="c-tok">Telegram Bot Token</label><input id="c-tok" type="password" autocomplete="off" placeholder="Token chỉ lưu trên ESP32">
+    <div class="row">
+      <div><label for="c-user">Chat ID người dùng</label><input id="c-user"></div>
+      <div><label for="c-care">Chat ID người chăm sóc</label><input id="c-care"></div>
+    </div>
+    <div class="row">
+      <div><label for="c-ai">Mô hình AI</label><select id="c-ai"><option value="gemini">Gemini</option><option value="openai">OpenAI</option></select></div>
+      <div><label for="c-to">Timeout cảnh báo (phút)</label><input id="c-to" type="number" min="1" max="60"></div>
+    </div>
+    <p class="msg">API key Gemini/OpenAI nhập trực tiếp vào firmware, không nhập ở web.</p>
+    <button class="btn" id="c-save">Lưu cấu hình</button>
+  </div>
+</section>
+
+<section id="s-chat">
+  <h2>Hỏi trợ lý AI</h2>
+  <div class="panel">
+    <div id="chatlog"><div class="b ai">Xin chào! Bạn cần hỏi gì về cách dùng thuốc?</div></div>
+    <div class="chatbar"><input id="q" aria-label="Câu hỏi" placeholder="Nhập câu hỏi…"><button class="btn" id="send">Gửi</button></div>
+  </div>
+</section>
+</main>
+<div id="toast" role="status"></div>
+
+<script>
+const $=s=>document.querySelector(s);
+const LABEL={pending:'Chờ uống',taken:'Đã uống',missed:'Bỏ lỡ',idle:'Chưa đến giờ'};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const pad=n=>String(n).padStart(2,'0');
+const today=()=>{const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())};
+function toast(t){const e=$('#toast');e.textContent=t;e.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>e.style.display='none',2200)}
+
+/* ---------- Dữ liệu giả (chỉ dùng khi không gọi được ESP32) ---------- */
+const mock={
+  nextId:4,
+  sch:[{id:1,comp:1,drug:'Thuốc dạ dày',time:'08:00',note:'Uống sau ăn 15 phút'},
+       {id:2,comp:2,drug:'Vitamin C',time:'12:00',note:'Uống cùng nước lọc'},
+       {id:3,comp:3,drug:'Thuốc huyết áp',time:'20:00',note:'Uống sau bữa tối'}],
+  st:{1:{state:'pending',rem:540},2:{state:'idle',rem:0},3:{state:'taken',rem:0}},
+  logs:[{t:today()+' 20:01',comp:3,drug:'Thuốc huyết áp',state:'taken'},
+        {t:today()+' 12:00',comp:2,drug:'Vitamin C',state:'taken'},
+        {t:'2026-10-18 20:12',comp:3,drug:'Thuốc huyết áp',state:'missed'},
+        {t:'2026-10-18 08:03',comp:1,drug:'Thuốc dạ dày',state:'taken'}],
+  cfg:{ssid:'NhaToi_WiFi',wpass:'',tok:'',user:'123456789',care:'987654321',ai:'gemini',timeout:10}
+};
+function mockApi(path,o){
+  const m=(o.method||'GET').toUpperCase(),body=o.body?JSON.parse(o.body):{};
+  const u=new URL(path,'http://x');
+  if(u.pathname==='/api/status'){
+    const n=new Date();
+    return {time:pad(n.getHours())+':'+pad(n.getMinutes())+':'+pad(n.getSeconds()),
+      compartments:[1,2,3].map(id=>{const s=mock.sch.find(x=>x.comp===id)||{};const st=mock.st[id];
+        return {id,drug:s.drug||'(chưa đặt lịch)',next:s.time||'--:--',state:st.state,remaining:st.rem}})};
+  }
+  if(u.pathname==='/api/schedules'){
+    if(m==='POST'){const s={id:mock.nextId++,...body};mock.sch.push(s);return s}
+    return mock.sch;
+  }
+  if(u.pathname.startsWith('/api/schedules/')&&m==='DELETE'){
+    const id=+u.pathname.split('/').pop();mock.sch=mock.sch.filter(s=>s.id!==id);return {ok:true};
+  }
+  if(u.pathname==='/api/logs'){const d=u.searchParams.get('date');return mock.logs.filter(l=>!d||l.t.startsWith(d))}
+  if(u.pathname==='/api/config'){if(m==='POST'){Object.assign(mock.cfg,body);return {ok:true}}return mock.cfg}
+  if(u.pathname==='/api/chat'){
+    return {reply:'(Phản hồi mẫu) Với câu hỏi “'+body.q+'”, bạn nên uống thuốc đúng giờ, đúng liều và hỏi bác sĩ hoặc dược sĩ nếu có triệu chứng bất thường. Khi nối với ESP32, câu trả lời sẽ do Gemini/OpenAI tạo ra.'};
+  }
+  if(u.pathname.startsWith('/api/simulate/')){
+    const id=+u.pathname.split('/').pop(),s=mock.sch.find(x=>x.comp===id)||{};
+    mock.st[id]={state:'taken',rem:0};
+    const n=new Date();mock.logs.unshift({t:today()+' '+pad(n.getHours())+':'+pad(n.getMinutes()),comp:id,drug:s.drug||'',state:'taken'});
+    return {ok:true};
+  }
+  return {};
+}
+setInterval(()=>{for(const id in mock.st){const s=mock.st[id];
+  if(s.state==='pending'&&s.rem>0){s.rem--;
+    if(s.rem===0){s.state='missed';const sc=mock.sch.find(x=>x.comp==id)||{};
+      const n=new Date();mock.logs.unshift({t:today()+' '+pad(n.getHours())+':'+pad(n.getMinutes()),comp:+id,drug:sc.drug||'',state:'missed'})}}}},1000);
+
+/* ---------- Lớp gọi API: thử ESP32 trước, lỗi thì dùng dữ liệu giả ---------- */
+let live=false;
+async function api(path,o={}){
+  try{
+    const r=await fetch(path,{...o,headers:{'Content-Type':'application/json'}});
+    if(!r.ok||!(r.headers.get('content-type')||'').includes('json'))throw 0;
+    live=true;return await r.json();
+  }catch(e){live=false;return mockApi(path,o)}
+}
+function setMode(){
+  $('#mode').textContent=live?'Đã kết nối thiết bị':'Chế độ demo (dữ liệu giả)';
+  $('#demohint').textContent=live?'':'Đang chạy dữ liệu giả. Nhấn “Giả lập lấy thuốc” ở thẻ Chờ uống để thử.';
+}
+
+/* ---------- Điều hướng ---------- */
+const TABS=[['dash','Tổng quan'],['sched','Lịch uống'],['log','Lịch sử'],['cfg','Cài đặt'],['chat','Trợ lý AI']];
+$('#tabs').innerHTML=TABS.map(([k,t],i)=>`<button role="tab" data-k="${k}" aria-selected="${i==0}">${t}</button>`).join('');
+$('#tabs').onclick=e=>{const k=e.target.dataset.k;if(!k)return;
+  document.querySelectorAll('nav button').forEach(b=>b.setAttribute('aria-selected',b.dataset.k===k));
+  document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',s.id==='s-'+k));
+  if(k==='sched')loadSched();if(k==='log')loadLogs();if(k==='cfg')loadCfg()};
+
+/* ---------- Tổng quan ---------- */
+async function refresh(){
+  const d=await api('/api/status');setMode();
+  $('#clock').textContent=d.time;
+  $('#cards').innerHTML=d.compartments.map(c=>`
+    <div class="card ${c.state}">
+      <h3>Ngăn ${c.id}</h3>
+      <p style="margin:0"><b>${esc(c.drug)}</b></p>
+      <p style="margin:4px 0">Giờ uống: ${esc(c.next)}</p>
+      <span class="badge">${LABEL[c.state]||c.state}</span>
+      ${c.state==='pending'?`<div class="count">${pad(Math.floor(c.remaining/60))}:${pad(c.remaining%60)}</div><div class="msg">còn lại trước khi báo người chăm sóc</div>${live?'':`<button class="btn alt" data-sim="${c.id}">Giả lập lấy thuốc</button>`}`:''}
+    </div>`).join('');
+}
+$('#cards').onclick=async e=>{const id=e.target.dataset.sim;if(id){await api('/api/simulate/'+id,{method:'POST'});toast('Đã ghi nhận: Đã uống');refresh()}};
+refresh();setInterval(refresh,2000);
+
+/* ---------- Lịch ---------- */
+async function loadSched(){
+  const list=await api('/api/schedules');
+  $('#sch-body').innerHTML=list.length?list.map(s=>`<tr><td>${s.comp}</td><td>${esc(s.drug)}</td><td>${esc(s.time)}</td><td>${esc(s.note||'')}</td><td><button class="btn del" data-del="${s.id}">Xóa</button></td></tr>`).join('')
+    :'<tr><td colspan="5" class="msg">Chưa có lịch nào. Thêm lịch ở form phía trên.</td></tr>';
+}
+$('#sch-body').onclick=async e=>{const id=e.target.dataset.del;if(!id)return;
+  await api('/api/schedules/'+id,{method:'DELETE'});toast('Đã xóa lịch');loadSched()};
+$('#f-add').onclick=async()=>{
+  const comp=+$('#f-comp').value,drug=$('#f-drug').value.trim(),time=$('#f-time').value,note=$('#f-note').value.trim();
+  const err=$('#f-err');err.textContent='';
+  if(!drug)return err.textContent='Hãy nhập tên thuốc.';
+  if(!/^\d{2}:\d{2}$/.test(time))return err.textContent='Hãy chọn giờ uống hợp lệ.';
+  const list=await api('/api/schedules');
+  if(list.some(s=>s.comp===comp&&s.time===time))return err.textContent='Ngăn '+comp+' đã có lịch vào giờ này.';
+  await api('/api/schedules',{method:'POST',body:JSON.stringify({comp,drug,time,note})});
+  $('#f-drug').value='';$('#f-note').value='';toast('Đã thêm lịch');loadSched();
+};
+
+/* ---------- Lịch sử ---------- */
+async function loadLogs(){
+  const d=$('#l-date').value;
+  const list=await api('/api/logs'+(d?'?date='+d:''));
+  $('#log-body').innerHTML=list.length?list.map(l=>`<tr><td>${esc(l.t)}</td><td>${l.comp}</td><td>${esc(l.drug)}</td><td><b style="color:var(--${l.state==='taken'?'ok':'bad'})">${LABEL[l.state]}</b></td></tr>`).join('')
+    :'<tr><td colspan="4" class="msg">Không có bản ghi trong ngày này.</td></tr>';
+  const t=list.filter(l=>l.state==='taken').length,tot=list.filter(l=>l.state!=='pending').length;
+  $('#adh').textContent=tot?Math.round(t*100/tot)+'%':'--%';
+}
+$('#l-date').onchange=loadLogs;
+$('#l-all').onclick=()=>{$('#l-date').value='';loadLogs()};
+
+/* ---------- Cài đặt ---------- */
+async function loadCfg(){
+  const c=await api('/api/config');
+  $('#c-ssid').value=c.ssid||'';$('#c-user').value=c.user||'';$('#c-care').value=c.care||'';
+  $('#c-ai').value=c.ai||'gemini';$('#c-to').value=c.timeout||10;
+}
+$('#c-save').onclick=async()=>{
+  const to=+$('#c-to').value;
+  if(!(to>=1&&to<=60))return toast('Timeout phải từ 1 đến 60 phút');
+  const body={ssid:$('#c-ssid').value,user:$('#c-user').value,care:$('#c-care').value,ai:$('#c-ai').value,timeout:to};
+  if($('#c-wpass').value)body.wpass=$('#c-wpass').value;
+  if($('#c-tok').value)body.tok=$('#c-tok').value;
+  await api('/api/config',{method:'POST',body:JSON.stringify(body)});
+  $('#c-wpass').value='';$('#c-tok').value='';toast('Đã lưu cấu hình');
+};
+
+/* ---------- Chat AI ---------- */
+function bubble(t,who){const d=document.createElement('div');d.className='b '+who;d.textContent=t;$('#chatlog').appendChild(d);$('#chatlog').scrollTop=1e9;return d}
+async function send(){
+  const q=$('#q').value.trim();if(!q)return;
+  $('#q').value='';bubble(q,'me');const w=bubble('Đang trả lời…','ai');
+  const r=await api('/api/chat',{method:'POST',body:JSON.stringify({q})});
+  w.textContent=r.reply||'Không nhận được phản hồi. Hãy kiểm tra kết nối thiết bị.';
+}
+$('#send').onclick=send;$('#q').onkeydown=e=>{if(e.key==='Enter')send()};
+</script>
+</body>
+</html>
